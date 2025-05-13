@@ -51,20 +51,32 @@ interface NeuralConnectionProps {
 }
 
 const NeuralConnection: React.FC<NeuralConnectionProps> = ({ start, end, color, width, opacity }) => {
-  const ref = useRef<THREE.Object3D>(null);
+  // Fix: Make sure start and end points are valid and different
+  const validStart = Array.isArray(start) && start.length === 3 ? start : [0, 0, 0];
+  const validEnd = Array.isArray(end) && end.length === 3 ? end : [0, 0, 1];
   
-  const points = useMemo(() => [
-    new Vector3(...start),
-    new Vector3(...end)
-  ], [start, end]);
+  // Create points array from the valid start and end points
+  const points = useMemo(() => {
+    // Only proceed if the points are different
+    if (validStart.toString() === validEnd.toString()) {
+      return [
+        new Vector3(validStart[0], validStart[1], validStart[2]),
+        new Vector3(validStart[0], validStart[1], validStart[2] + 0.001)
+      ];
+    }
+    return [
+      new Vector3(validStart[0], validStart[1], validStart[2]),
+      new Vector3(validEnd[0], validEnd[1], validEnd[2])
+    ];
+  }, [validStart, validEnd]);
   
   return (
     <Line 
-      ref={ref}
       points={points}
       color={color}
       lineWidth={width}
       opacity={opacity}
+      transparent={true}
     />
   );
 };
