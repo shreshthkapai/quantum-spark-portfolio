@@ -1,6 +1,7 @@
+
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sphere, Line } from '@react-three/drei';
+import { OrbitControls, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 import { Vector3 } from 'three';
 
@@ -50,46 +51,62 @@ interface NeuralConnectionProps {
 }
 
 const NeuralConnection: React.FC<NeuralConnectionProps> = ({ start, end, color, width, opacity }) => {
-  // Ensure both start and end are valid arrays with 3 numeric values
-  const safeStart = Array.isArray(start) && start.length === 3 && 
-    start.every(val => typeof val === 'number' && !isNaN(val)) ? 
-    start : [0, 0, 0];
+  // Create a custom line without using the Line component
+  const lineRef = useRef<THREE.Line>(null);
   
-  const safeEnd = Array.isArray(end) && end.length === 3 && 
-    end.every(val => typeof val === 'number' && !isNaN(val)) ? 
-    end : [0, 0, 1];
-  
-  // Create points with a guaranteed minimum distance between them
-  const points = useMemo(() => {
-    // Check if points are too close or identical
-    const distance = Math.sqrt(
-      Math.pow(safeEnd[0] - safeStart[0], 2) + 
-      Math.pow(safeEnd[1] - safeStart[1], 2) + 
-      Math.pow(safeEnd[2] - safeStart[2], 2)
-    );
-    
-    if (distance < 0.01) {
-      // If points are too close, create a minimum offset
+  // Create points with guaranteed valid start and end positions
+  const pointsArray = useMemo(() => {
+    try {
+      // Ensure both start and end are valid arrays with 3 numeric values
+      const validStart = Array.isArray(start) && start.length === 3 &&
+        start.every(val => typeof val === 'number' && !isNaN(val))
+          ? start
+          : [0, 0, 0];
+        
+      const validEnd = Array.isArray(end) && end.length === 3 &&
+        end.every(val => typeof val === 'number' && !isNaN(val))
+          ? end
+          : [0, 0, 1];
+      
+      // Ensure the points are not identical
+      const isIdentical = validStart[0] === validEnd[0] && 
+                          validStart[1] === validEnd[1] && 
+                          validStart[2] === validEnd[2];
+      
+      if (isIdentical) {
+        validEnd[2] += 0.1; // Add a small offset to avoid identical points
+      }
+      
+      // Create geometry vertices
       return [
-        new Vector3(safeStart[0], safeStart[1], safeStart[2]),
-        new Vector3(safeStart[0], safeStart[1], safeStart[2] + 0.1) // Ensure minimum separation
+        new Vector3(validStart[0], validStart[1], validStart[2]),
+        new Vector3(validEnd[0], validEnd[1], validEnd[2])
+      ];
+    } catch (error) {
+      console.error("Error creating neural connection points:", error);
+      return [
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 1)
       ];
     }
-    
-    return [
-      new Vector3(safeStart[0], safeStart[1], safeStart[2]),
-      new Vector3(safeEnd[0], safeEnd[1], safeEnd[2])
-    ];
-  }, [safeStart, safeEnd]);
-  
+  }, [start, end]);
+
+  // Create the line geometry
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry().setFromPoints(pointsArray);
+    return geo;
+  }, [pointsArray]);
+
   return (
-    <Line 
-      points={points}
-      color={color}
-      lineWidth={width}
-      opacity={opacity}
-      transparent={true}
-    />
+    <line ref={lineRef} geometry={geometry}>
+      <lineBasicMaterial 
+        attach="material" 
+        color={color} 
+        opacity={opacity} 
+        transparent={true}
+        linewidth={width} // Note: linewidth may not work in WebGL
+      />
+    </line>
   );
 };
 
@@ -101,20 +118,24 @@ interface NeuralLayerProps {
 }
 
 const NeuralLayer: React.FC<NeuralLayerProps> = ({ position, count, radius, pulse = false }) => {
-  return Array.from({ length: count }, (_, i) => {
-    const angle = (i / count) * Math.PI * 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    
-    return (
-      <NeuronNode 
-        key={i} 
-        position={[x + position[0], y + position[1], position[2]]} 
-        color={i % 3 === 0 ? "#6366F1" : "#8B5CF6"}
-        pulse={pulse}
-      />
-    );
-  });
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => {
+        const angle = (i / count) * Math.PI * 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        
+        return (
+          <NeuronNode 
+            key={i} 
+            position={[x + position[0], y + position[1], position[2]]} 
+            color={i % 3 === 0 ? "#6366F1" : "#8B5CF6"}
+            pulse={pulse}
+          />
+        );
+      })}
+    </>
+  );
 };
 
 interface MousePosition {
@@ -142,22 +163,19 @@ const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }
     
     try {
       // Connect first layer to second layer
-      for (let i = 0; i < layers[0].count; i++) {
+      for (let i = 0; i < layers[0].count; i += 2) { // Reduce number of connections for performance
         const angleI = (i / layers[0].count) * Math.PI * 2;
         const x1 = Math.cos(angleI) * layers[0].radius + layers[0].position[0];
         const y1 = Math.sin(angleI) * layers[0].radius + layers[0].position[1];
         const z1 = layers[0].position[2];
         
-        for (let j = 0; j < layers[1].count; j++) {
+        for (let j = 0; j < layers[1].count; j += 2) { // Reduce number of connections
           const angleJ = (j / layers[1].count) * Math.PI * 2;
           const x2 = Math.cos(angleJ) * layers[1].radius + layers[1].position[0];
           const y2 = Math.sin(angleJ) * layers[1].radius + layers[1].position[1];
           const z2 = layers[1].position[2];
           
-          // Only create connections if there's a minimum distance between points
-          const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2));
-          
-          if ((i + j) % 3 === 0 && distance > 0.01) { 
+          if ((i + j) % 3 === 0) {
             conns.push({
               start: [x1, y1, z1],
               end: [x2, y2, z2],
@@ -170,22 +188,19 @@ const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }
       }
       
       // Connect second layer to third layer
-      for (let i = 0; i < layers[1].count; i++) {
+      for (let i = 0; i < layers[1].count; i += 2) {
         const angleI = (i / layers[1].count) * Math.PI * 2;
         const x1 = Math.cos(angleI) * layers[1].radius + layers[1].position[0];
         const y1 = Math.sin(angleI) * layers[1].radius + layers[1].position[1];
         const z1 = layers[1].position[2];
         
-        for (let j = 0; j < layers[2].count; j++) {
+        for (let j = 0; j < layers[2].count; j += 2) {
           const angleJ = (j / layers[2].count) * Math.PI * 2;
           const x2 = Math.cos(angleJ) * layers[2].radius + layers[2].position[0];
           const y2 = Math.sin(angleJ) * layers[2].radius + layers[2].position[1];
           const z2 = layers[2].position[2];
           
-          // Only create connections if there's a minimum distance between points
-          const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2));
-          
-          if ((i + j) % 2 === 0 && distance > 0.01) {
+          if ((i + j) % 2 === 0) {
             conns.push({
               start: [x1, y1, z1],
               end: [x2, y2, z2],
@@ -205,31 +220,31 @@ const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }
 
   // Rotate the network based on mouse position
   useFrame(({ clock }) => {
-    if (groupRef.current && mousePosition.current) {
-      // Default gentle animation
-      const baseRotationY = Math.sin(clock.getElapsedTime() * 0.1) * 0.2;
-      
-      // Safely handle mouse position
-      const mouseX = mousePosition.current?.x || 0;
-      const mouseY = mousePosition.current?.y || 0;
-      
-      // Subtle rotation based on mouse position
-      const rotX = (mouseY * 0.1 - 0.05) * Math.PI;
-      const rotY = baseRotationY + (mouseX * 0.1 - 0.05) * Math.PI;
-      
-      // Apply rotations with lerping
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(
-        groupRef.current.rotation.x || 0,
-        rotX,
-        0.05
-      );
-      
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(
-        groupRef.current.rotation.y || 0,
-        rotY,
-        0.05
-      );
-    }
+    if (!groupRef.current) return;
+    
+    // Default gentle animation
+    const baseRotationY = Math.sin(clock.getElapsedTime() * 0.1) * 0.2;
+    
+    // Safely handle mouse position
+    const mouseX = mousePosition.current?.x || 0;
+    const mouseY = mousePosition.current?.y || 0;
+    
+    // Subtle rotation based on mouse position
+    const rotX = (mouseY * 0.1 - 0.05) * Math.PI;
+    const rotY = baseRotationY + (mouseX * 0.1 - 0.05) * Math.PI;
+    
+    // Apply rotations with lerping
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x || 0,
+      rotX,
+      0.05
+    );
+    
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(
+      groupRef.current.rotation.y || 0,
+      rotY,
+      0.05
+    );
   });
   
   return (
@@ -279,6 +294,8 @@ const NeuralNetwork3D: React.FC<NeuralNetwork3DProps> = ({ className = "" }) => 
           height: '100%',
           backgroundColor: 'transparent',
         }}
+        gl={{ preserveDrawingBuffer: true }}
+        dpr={[1, 1.5]} // Limit device pixel ratio for better performance
       >
         <ambientLight intensity={0.5} />
         <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />

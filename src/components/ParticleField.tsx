@@ -65,7 +65,11 @@ interface ParticleFieldProps {
 const ParticleField: React.FC<ParticleFieldProps> = ({ className = "" }) => {
   return (
     <div className={`${className}`}>
-      <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
+      <Canvas 
+        camera={{ position: [0, 0, 5], fov: 60 }}
+        gl={{ preserveDrawingBuffer: true }}
+        dpr={[1, 2]} // Optimize performance by setting device pixel ratio bounds
+      >
         <ParticleCloud />
       </Canvas>
     </div>
