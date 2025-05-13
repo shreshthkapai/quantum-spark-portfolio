@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sphere, Line } from '@react-three/drei';
@@ -206,25 +205,30 @@ const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }
 
   // Rotate the network based on mouse position
   useFrame(({ clock }) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.1) * 0.2;
+    if (groupRef.current && mousePosition.current) {
+      // Default gentle animation
+      const baseRotationY = Math.sin(clock.getElapsedTime() * 0.1) * 0.2;
       
-      if (mousePosition.current) {
-        // Subtle rotation based on mouse position
-        const rotX = (mousePosition.current.y * 0.1 - 0.05) * Math.PI;
-        const rotY = (mousePosition.current.x * 0.1 - 0.05) * Math.PI;
-        
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(
-          groupRef.current.rotation.x || 0,
-          rotX,
-          0.05
-        );
-        groupRef.current.rotation.y = THREE.MathUtils.lerp(
-          groupRef.current.rotation.y || 0,
-          rotY,
-          0.05
-        );
-      }
+      // Safely handle mouse position
+      const mouseX = mousePosition.current?.x || 0;
+      const mouseY = mousePosition.current?.y || 0;
+      
+      // Subtle rotation based on mouse position
+      const rotX = (mouseY * 0.1 - 0.05) * Math.PI;
+      const rotY = baseRotationY + (mouseX * 0.1 - 0.05) * Math.PI;
+      
+      // Apply rotations with lerping
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(
+        groupRef.current.rotation.x || 0,
+        rotX,
+        0.05
+      );
+      
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(
+        groupRef.current.rotation.y || 0,
+        rotY,
+        0.05
+      );
     }
   });
   
@@ -250,11 +254,13 @@ const NeuralNetwork3D: React.FC<NeuralNetwork3DProps> = ({ className = "" }) => 
   
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Normalize mouse position from -1 to 1
-      mousePosition.current = {
-        x: (e.clientX / window.innerWidth) * 2 - 1,
-        y: -(e.clientY / window.innerHeight) * 2 + 1
-      };
+      if (mousePosition.current) {
+        // Normalize mouse position from -1 to 1
+        mousePosition.current = {
+          x: (e.clientX / window.innerWidth) * 2 - 1,
+          y: -(e.clientY / window.innerHeight) * 2 + 1
+        };
+      }
     };
     
     window.addEventListener('mousemove', handleMouseMove);
