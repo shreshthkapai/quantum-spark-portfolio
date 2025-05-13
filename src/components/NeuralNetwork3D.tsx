@@ -51,24 +51,37 @@ interface NeuralConnectionProps {
 }
 
 const NeuralConnection: React.FC<NeuralConnectionProps> = ({ start, end, color, width, opacity }) => {
-  // Fix: Make sure start and end points are valid and different
-  const validStart = Array.isArray(start) && start.length === 3 ? start : [0, 0, 0];
-  const validEnd = Array.isArray(end) && end.length === 3 ? end : [0, 0, 1];
+  // Ensure both start and end are valid arrays with 3 numeric values
+  const safeStart = Array.isArray(start) && start.length === 3 && 
+    start.every(val => typeof val === 'number' && !isNaN(val)) ? 
+    start : [0, 0, 0];
   
-  // Create points array from the valid start and end points
+  const safeEnd = Array.isArray(end) && end.length === 3 && 
+    end.every(val => typeof val === 'number' && !isNaN(val)) ? 
+    end : [0, 0, 1];
+  
+  // Create points with a guaranteed minimum distance between them
   const points = useMemo(() => {
-    // Only proceed if the points are different
-    if (validStart.toString() === validEnd.toString()) {
+    // Check if points are too close or identical
+    const distance = Math.sqrt(
+      Math.pow(safeEnd[0] - safeStart[0], 2) + 
+      Math.pow(safeEnd[1] - safeStart[1], 2) + 
+      Math.pow(safeEnd[2] - safeStart[2], 2)
+    );
+    
+    if (distance < 0.01) {
+      // If points are too close, create a minimum offset
       return [
-        new Vector3(validStart[0], validStart[1], validStart[2]),
-        new Vector3(validStart[0], validStart[1], validStart[2] + 0.001)
+        new Vector3(safeStart[0], safeStart[1], safeStart[2]),
+        new Vector3(safeStart[0], safeStart[1], safeStart[2] + 0.1) // Ensure minimum separation
       ];
     }
+    
     return [
-      new Vector3(validStart[0], validStart[1], validStart[2]),
-      new Vector3(validEnd[0], validEnd[1], validEnd[2])
+      new Vector3(safeStart[0], safeStart[1], safeStart[2]),
+      new Vector3(safeEnd[0], safeEnd[1], safeEnd[2])
     ];
-  }, [validStart, validEnd]);
+  }, [safeStart, safeEnd]);
   
   return (
     <Line 
@@ -128,54 +141,64 @@ const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }
   const connections = useMemo(() => {
     const conns: NeuralConnectionProps[] = [];
     
-    // Connect first layer to second layer
-    for (let i = 0; i < layers[0].count; i++) {
-      const angleI = (i / layers[0].count) * Math.PI * 2;
-      const x1 = Math.cos(angleI) * layers[0].radius + layers[0].position[0];
-      const y1 = Math.sin(angleI) * layers[0].radius + layers[0].position[1];
-      const z1 = layers[0].position[2];
-      
-      for (let j = 0; j < layers[1].count; j++) {
-        const angleJ = (j / layers[1].count) * Math.PI * 2;
-        const x2 = Math.cos(angleJ) * layers[1].radius + layers[1].position[0];
-        const y2 = Math.sin(angleJ) * layers[1].radius + layers[1].position[1];
-        const z2 = layers[1].position[2];
+    try {
+      // Connect first layer to second layer
+      for (let i = 0; i < layers[0].count; i++) {
+        const angleI = (i / layers[0].count) * Math.PI * 2;
+        const x1 = Math.cos(angleI) * layers[0].radius + layers[0].position[0];
+        const y1 = Math.sin(angleI) * layers[0].radius + layers[0].position[1];
+        const z1 = layers[0].position[2];
         
-        if ((i + j) % 3 === 0) { // Only connect some nodes for cleaner visualization
-          conns.push({
-            start: [x1, y1, z1],
-            end: [x2, y2, z2],
-            color: '#8B5CF6',
-            width: 0.5,
-            opacity: 0.4,
-          });
+        for (let j = 0; j < layers[1].count; j++) {
+          const angleJ = (j / layers[1].count) * Math.PI * 2;
+          const x2 = Math.cos(angleJ) * layers[1].radius + layers[1].position[0];
+          const y2 = Math.sin(angleJ) * layers[1].radius + layers[1].position[1];
+          const z2 = layers[1].position[2];
+          
+          // Only create connections if there's a minimum distance between points
+          const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2));
+          
+          if ((i + j) % 3 === 0 && distance > 0.01) { 
+            conns.push({
+              start: [x1, y1, z1],
+              end: [x2, y2, z2],
+              color: '#8B5CF6',
+              width: 0.5,
+              opacity: 0.4,
+            });
+          }
         }
       }
-    }
-    
-    // Connect second layer to third layer
-    for (let i = 0; i < layers[1].count; i++) {
-      const angleI = (i / layers[1].count) * Math.PI * 2;
-      const x1 = Math.cos(angleI) * layers[1].radius + layers[1].position[0];
-      const y1 = Math.sin(angleI) * layers[1].radius + layers[1].position[1];
-      const z1 = layers[1].position[2];
       
-      for (let j = 0; j < layers[2].count; j++) {
-        const angleJ = (j / layers[2].count) * Math.PI * 2;
-        const x2 = Math.cos(angleJ) * layers[2].radius + layers[2].position[0];
-        const y2 = Math.sin(angleJ) * layers[2].radius + layers[2].position[1];
-        const z2 = layers[2].position[2];
+      // Connect second layer to third layer
+      for (let i = 0; i < layers[1].count; i++) {
+        const angleI = (i / layers[1].count) * Math.PI * 2;
+        const x1 = Math.cos(angleI) * layers[1].radius + layers[1].position[0];
+        const y1 = Math.sin(angleI) * layers[1].radius + layers[1].position[1];
+        const z1 = layers[1].position[2];
         
-        if ((i + j) % 2 === 0) { // Only connect some nodes for cleaner visualization
-          conns.push({
-            start: [x1, y1, z1],
-            end: [x2, y2, z2],
-            color: '#6366F1',
-            width: 0.5,
-            opacity: 0.4,
-          });
+        for (let j = 0; j < layers[2].count; j++) {
+          const angleJ = (j / layers[2].count) * Math.PI * 2;
+          const x2 = Math.cos(angleJ) * layers[2].radius + layers[2].position[0];
+          const y2 = Math.sin(angleJ) * layers[2].radius + layers[2].position[1];
+          const z2 = layers[2].position[2];
+          
+          // Only create connections if there's a minimum distance between points
+          const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2));
+          
+          if ((i + j) % 2 === 0 && distance > 0.01) {
+            conns.push({
+              start: [x1, y1, z1],
+              end: [x2, y2, z2],
+              color: '#6366F1',
+              width: 0.5,
+              opacity: 0.4,
+            });
+          }
         }
       }
+    } catch (error) {
+      console.error("Error creating neural connections:", error);
     }
     
     return conns;
