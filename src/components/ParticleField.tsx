@@ -4,8 +4,12 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 
-const ParticleCloud = ({ count = 500 }) => {
-  const mesh = useRef();
+interface ParticleCloudProps {
+  count?: number;
+}
+
+const ParticleCloud: React.FC<ParticleCloudProps> = ({ count = 500 }) => {
+  const mesh = useRef<THREE.Points>(null);
   
   // Generate random positions for particles
   const particlePositions = useMemo(() => {
@@ -54,7 +58,11 @@ const ParticleCloud = ({ count = 500 }) => {
   );
 };
 
-const ParticleField = ({ className = "" }) => {
+interface ParticleFieldProps {
+  className?: string;
+}
+
+const ParticleField: React.FC<ParticleFieldProps> = ({ className = "" }) => {
   return (
     <div className={`${className}`}>
       <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>

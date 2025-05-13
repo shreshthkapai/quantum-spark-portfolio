@@ -2,9 +2,12 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
+import * as THREE from 'three';
 
-const AnimatedGrid = () => {
-  const gridRef = useRef();
+interface AnimatedGridProps {}
+
+const AnimatedGrid: React.FC<AnimatedGridProps> = () => {
+  const gridRef = useRef<THREE.Group>(null);
   
   useFrame(({ clock }) => {
     if (gridRef.current) {
@@ -29,7 +32,11 @@ const AnimatedGrid = () => {
   );
 };
 
-const FloatingGrid = ({ className = "" }) => {
+interface FloatingGridProps {
+  className?: string;
+}
+
+const FloatingGrid: React.FC<FloatingGridProps> = ({ className = "" }) => {
   return (
     <div className={`${className}`}>
       <Canvas

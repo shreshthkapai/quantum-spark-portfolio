@@ -5,11 +5,17 @@ import { OrbitControls, Sphere, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { Vector3 } from 'three';
 
-const NeuronNode = ({ position, color, pulse = false }) => {
-  const meshRef = useRef();
+interface NeuronNodeProps {
+  position: [number, number, number];
+  color: string;
+  pulse?: boolean;
+}
+
+const NeuronNode: React.FC<NeuronNodeProps> = ({ position, color, pulse = false }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   
-  useFrame((state) => {
+  useFrame(() => {
     if (meshRef.current && pulse) {
       meshRef.current.scale.x = meshRef.current.scale.y = meshRef.current.scale.z = THREE.MathUtils.lerp(
         meshRef.current.scale.x,
@@ -36,8 +42,16 @@ const NeuronNode = ({ position, color, pulse = false }) => {
   );
 };
 
-const NeuralConnection = ({ start, end, color, width, opacity }) => {
-  const ref = useRef();
+interface NeuralConnectionProps {
+  start: [number, number, number];
+  end: [number, number, number];
+  color: string;
+  width: number;
+  opacity: number;
+}
+
+const NeuralConnection: React.FC<NeuralConnectionProps> = ({ start, end, color, width, opacity }) => {
+  const ref = useRef<THREE.Object3D>(null);
   
   const points = useMemo(() => [
     new Vector3(...start),
@@ -50,12 +64,19 @@ const NeuralConnection = ({ start, end, color, width, opacity }) => {
       points={points}
       color={color}
       lineWidth={width}
-      alpha={opacity}
+      opacity={opacity}
     />
   );
 };
 
-const NeuralLayer = ({ position, count, radius, pulse = false }) => {
+interface NeuralLayerProps {
+  position: [number, number, number];
+  count: number;
+  radius: number;
+  pulse?: boolean;
+}
+
+const NeuralLayer: React.FC<NeuralLayerProps> = ({ position, count, radius, pulse = false }) => {
   return Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * Math.PI * 2;
     const x = Math.cos(angle) * radius;
@@ -72,19 +93,28 @@ const NeuralLayer = ({ position, count, radius, pulse = false }) => {
   });
 };
 
-const NeuralNetworkScene = ({ mousePosition }) => {
-  const groupRef = useRef();
+interface MousePosition {
+  x: number;
+  y: number;
+}
+
+interface NeuralNetworkSceneProps {
+  mousePosition: React.RefObject<MousePosition>;
+}
+
+const NeuralNetworkScene: React.FC<NeuralNetworkSceneProps> = ({ mousePosition }) => {
+  const groupRef = useRef<THREE.Group>(null);
 
   // Create layers of the neural network
   const layers = [
-    { position: [-4, 0, 0], count: 6, radius: 2 },
-    { position: [0, 0, 0], count: 8, radius: 2.5, pulse: true },
-    { position: [4, 0, 0], count: 4, radius: 1.5 },
+    { position: [-4, 0, 0] as [number, number, number], count: 6, radius: 2 },
+    { position: [0, 0, 0] as [number, number, number], count: 8, radius: 2.5, pulse: true },
+    { position: [4, 0, 0] as [number, number, number], count: 4, radius: 1.5 },
   ];
 
   // Create connections between layers
   const connections = useMemo(() => {
-    const conns = [];
+    const conns: NeuralConnectionProps[] = [];
     
     // Connect first layer to second layer
     for (let i = 0; i < layers[0].count; i++) {
@@ -176,11 +206,15 @@ const NeuralNetworkScene = ({ mousePosition }) => {
   );
 };
 
-const NeuralNetwork3D = ({ className = "" }) => {
-  const mousePosition = useRef({ x: 0, y: 0 });
+interface NeuralNetwork3DProps {
+  className?: string;
+}
+
+const NeuralNetwork3D: React.FC<NeuralNetwork3DProps> = ({ className = "" }) => {
+  const mousePosition = useRef<MousePosition>({ x: 0, y: 0 });
   
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       // Normalize mouse position from -1 to 1
       mousePosition.current = {
         x: (e.clientX / window.innerWidth) * 2 - 1,
